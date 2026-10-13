@@ -1,24 +1,19 @@
 import type { Metadata } from "next";
-import "@xyflow/react/dist/style.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SOJI.OS | An interactive map of a product career",
-  description: "Explore the systems, decisions and outcomes behind Soji Jacob's work across product ownership, financial services technology and AI workflow automation.",
+  title: "Soji Jacob | Product, Financial Services and AI",
+  description: "A visual journey through Soji Jacob's work across product ownership, financial services technology, asset finance and AI workflow automation.",
   metadataBase: new URL("https://soji.in"),
   openGraph: {
-    title: "SOJI.OS | Soji Jacob",
-    description: "I make complex systems work better.",
+    title: "Soji Jacob | I make complex systems work better",
+    description: "Explore the journey, the work and the outcomes behind product and technology delivery.",
     url: "https://soji.in",
-    siteName: "SOJI.OS",
+    siteName: "Soji Jacob",
     type: "website"
   }
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
-  );
+  return <html lang="en"><body>{children}</body></html>;
 }

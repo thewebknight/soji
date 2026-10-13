@@ -1,216 +1,111 @@
 "use client";
 
-import {
-  Background, BackgroundVariant, Controls, MiniMap, ReactFlow, ReactFlowProvider,
-  useEdgesState, useNodesState, useReactFlow, type Node, type NodeProps
-} from "@xyflow/react";
-import { Search, X, ArrowLeft, RotateCcw, Mail, Linkedin, Compass, Route, ChevronRight, ArrowUpRight, Command, Plus, Minus, LocateFixed } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { categoryColors, categoryLabels, graphEdges, graphNodes, stories, type Category, type GraphNodeData } from "@/lib/graph";
+import { useState } from "react";
+import { ArrowDownRight, ArrowUpRight, BriefcaseBusiness, ChevronDown, Compass, Download, Mail, MapPin, Menu, Sparkles, X } from "lucide-react";
 
-type TopicNode = Node<GraphNodeData>;
-function Topic({ data, selected }: NodeProps<TopicNode>) {
-  const category = data.category as Category;
-  return <div className={`topic-node category-${category} ${selected ? "is-selected" : ""}`}><span className="node-orbit" /><span className="node-eyebrow">{data.eyebrow}</span><span className="node-label">{data.label}</span>{data.evidence && <span className="node-evidence">{data.evidence}</span>}</div>;
-}
-const nodeTypes = { topic: Topic };
+const places = [
+  { id: "product", number: "01", title: "Product, made practical", kicker: "THE CRAFT", color: "ochre", text: "I turn complex business needs into clear priorities, useful workflows and products teams can actually deliver.", details: ["Product discovery and requirements", "Roadmaps, backlogs and acceptance criteria", "Stakeholder alignment, UAT and release"] },
+  { id: "finance", number: "02", title: "Where money moves", kicker: "THE DOMAIN", color: "blue", text: "More than a decade in the machinery of financial services, from leasing and lending to payments and asset finance.", details: ["Odessa lease and loan platforms", "Origination to back office workflows", "Integrations, configuration and migration"] },
+  { id: "ai", number: "03", title: "Less busywork. Better work.", kicker: "THE NEXT FRONTIER", color: "violet", text: "I bring AI into document heavy operations with a focus on the whole workflow, human review and outcomes that matter.", details: ["AI driven document parsing", "Human validation and exception paths", "Workflow automation and measurable impact"] },
+  { id: "experience", number: "04", title: "Built with real teams", kicker: "THE JOURNEY", color: "coral", text: "My work spans financial services transformation, shared platforms, digital products and cross functional delivery.", details: ["Natixis · 2025 to 2026", "Société Générale GSC · 2019 to 2025", "Cognizant / Google GTech · 2012 to 2019"] },
+  { id: "impact", number: "05", title: "Make the difference visible", kicker: "THE OUTCOMES", color: "green", text: "The point of a better system is what it changes for the people using it. These are reported outcomes from my work.", details: ["1,500 documents per day designed processing volume", "70% reduction in manual document handling", "30 to 35% faster delivery timelines"] },
+];
 
-function NetworkExperience() {
-  const [nodes,setNodes,onNodesChange] = useNodesState<TopicNode>(graphNodes);
-  const [edges,setEdges,onEdgesChange] = useEdgesState(graphEdges);
-  const [selectedId,setSelectedId] = useState<string|null>(null);
-  const [hoveredId,setHoveredId] = useState<string|null>(null);
-  const [query,setQuery] = useState("");
-  const [searchOpen,setSearchOpen] = useState(false);
-  const [clusterOpen,setClusterOpen] = useState(false);
-  const [storyId,setStoryId] = useState<string|null>(null);
-  const [storyIndex,setStoryIndex] = useState(0);
-  const [history,setHistory] = useState<string[]>([]);
-  const [mobileInfoOpen,setMobileInfoOpen] = useState(false);
-  const {fitView,setCenter,zoomIn,zoomOut} = useReactFlow();
-
-  const selected = useMemo(()=>graphNodes.find(node=>node.id===selectedId)??null,[selectedId]);
-  const story = stories.find(item=>item.id===storyId)??null;
-  const storyStep = story?.steps[storyIndex]??null;
-  const searchResults = useMemo(()=>{
-    const q=query.trim().toLowerCase();
-    if(!q) return [];
-    return graphNodes.filter(node=>{
-      const d=node.data;
-      return `${d.label} ${d.eyebrow} ${d.description} ${d.category} ${d.details.join(" ")}`.toLowerCase().includes(q);
-    }).slice(0,7);
-  },[query]);
-
-  const connectedIds = useMemo(()=>{
-    if(!selectedId&&!hoveredId&&!storyStep) return new Set<string>();
-    const focusId=storyStep?.nodeId??selectedId??hoveredId;
-    const found=new Set<string>([focusId!]);
-    graphEdges.forEach(edge=>{
-      if(edge.source===focusId) found.add(String(edge.target));
-      if(edge.target===focusId) found.add(String(edge.source));
-    });
-    if(story&&storyStep) story.steps.forEach(step=>found.add(step.nodeId));
-    return found;
-  },[selectedId,hoveredId,story,storyStep]);
-
-  useEffect(()=>{
-    setNodes(current=>current.map(node=>{
-      const activeFocus=storyStep?.nodeId??selectedId??hoveredId;
-      const hasFocus=Boolean(activeFocus);
-      const inPath=story?story.steps.some(step=>step.nodeId===node.id):false;
-      return {...node,selected:node.id===selectedId,className:[
-        node.id===activeFocus?"focus-node":"",
-        hasFocus&&!connectedIds.has(node.id)?"dim-node":"",
-        story&&inPath?"story-node":""
-      ].filter(Boolean).join(" ")};
-    }));
-    setEdges(current=>current.map(edge=>{
-      const activeFocus=storyStep?.nodeId??selectedId??hoveredId;
-      const isDirect=Boolean(activeFocus)&&(edge.source===activeFocus||edge.target===activeFocus);
-      const inStory=story?story.steps.some((step,index)=>index<storyIndex&&(step.nodeId===edge.source||step.nodeId===edge.target)):false;
-      return {...edge,animated:isDirect||inStory,style:{...edge.style,stroke:isDirect?"var(--edge-active)":inStory?"var(--lime)":"var(--edge)",strokeWidth:isDirect?2:inStory?1.8:1.1,opacity:activeFocus&&!isDirect&&!inStory?0.12:0.9}};
-    }));
-  },[selectedId,hoveredId,story,storyIndex,storyStep,connectedIds,setNodes,setEdges]);
-
-  const focusNode=useCallback((id:string,pushHistory=true)=>{
-    const node=graphNodes.find(item=>item.id===id);
-    if(!node) return;
-    if(pushHistory&&selectedId&&selectedId!==id) setHistory(old=>[...old,selectedId]);
-    setSelectedId(id);setMobileInfoOpen(true);setSearchOpen(false);setQuery("");
-    window.setTimeout(()=>setCenter(node.position.x+95,node.position.y+30,{zoom:1.05,duration:650}),20);
-  },[selectedId,setCenter]);
-
-  const goBack=useCallback(()=>{
-    const previous=history[history.length-1];
-    if(previous){setHistory(old=>old.slice(0,-1));focusNode(previous,false);}
-    else{setSelectedId(null);setMobileInfoOpen(false);fitView({padding:0.2,duration:650});}
-  },[history,focusNode,fitView]);
-
-  const reset=useCallback(()=>{
-    setSelectedId(null);setHoveredId(null);setStoryId(null);setStoryIndex(0);setHistory([]);setMobileInfoOpen(false);
-    fitView({padding:0.2,duration:750});
-  },[fitView]);
-
-  const focusCategory=useCallback((category:Category)=>{
-    const subset=graphNodes.filter(node=>node.data.category===category);
-    if(!subset.length) return;
-    setSelectedId(null);setStoryId(null);
-    fitView({nodes:subset.map(node=>({id:node.id})),padding:0.55,duration:700});
-    setClusterOpen(false);
-  },[fitView]);
-
-  const startStory=(id:string)=>{
-    const chosen=stories.find(item=>item.id===id);
-    if(!chosen) return;
-    setStoryId(id);setStoryIndex(0);setSelectedId(null);setHistory([]);setMobileInfoOpen(false);
-    const node=graphNodes.find(item=>item.id===chosen.steps[0].nodeId);
-    if(node) setCenter(node.position.x+95,node.position.y+30,{zoom:1.1,duration:650});
-  };
-  const advanceStory=()=>{
-    if(!story) return;
-    if(storyIndex<story.steps.length-1){
-      const nextIndex=storyIndex+1;setStoryIndex(nextIndex);
-      const node=graphNodes.find(item=>item.id===story.steps[nextIndex].nodeId);
-      if(node) setCenter(node.position.x+95,node.position.y+30,{zoom:1.1,duration:600});
-    }else{setStoryId(null);setStoryIndex(0);fitView({padding:0.2,duration:650});}
-  };
-
-  useEffect(()=>{
-    const onKeyDown=(event:KeyboardEvent)=>{
-      const target=event.target as HTMLElement;
-      if((event.key==="/"||(event.key==="k"&&(event.metaKey||event.ctrlKey)))&&!["INPUT","TEXTAREA"].includes(target.tagName)){
-        event.preventDefault();setSearchOpen(true);window.setTimeout(()=>document.getElementById("graph-search")?.focus(),20);
-      }
-      if(event.key==="Escape"){setSearchOpen(false);setClusterOpen(false);setStoryId(null);setMobileInfoOpen(false);}
-      if(event.key==="Backspace"&&!["INPUT","TEXTAREA"].includes(target.tagName)) goBack();
-    };
-    window.addEventListener("keydown",onKeyDown);
-    return ()=>window.removeEventListener("keydown",onKeyDown);
-  },[goBack]);
-
-  const selectedCategory=selected?.data.category as Category|undefined;
-  const related=selected?graphEdges.filter(edge=>edge.source===selected.id||edge.target===selected.id).map(edge=>{
-    const id=edge.source===selected.id?String(edge.target):String(edge.source);
-    return graphNodes.find(node=>node.id===id);
-  }).filter((node):node is TopicNode=>Boolean(node)).slice(0,8):[];
-
-  return <main className="os-shell">
-    <div className="topbar">
-      <button className="wordmark" onClick={reset} aria-label="Reset to full network"><span className="wordmark-symbol">S<span>.</span></span><span className="wordmark-copy"><strong>SOJI.OS</strong><small>CAREER GRAPH / 001</small></span></button>
-      <div className="topbar-center"><span className="status-dot"/> LIVE KNOWLEDGE MAP <span className="topbar-divider">/</span> PRODUCT SYSTEMS</div>
-      <div className="topbar-actions"><button className="icon-button" onClick={()=>setSearchOpen(true)} aria-label="Search the network"><Search size={16}/><span>Search</span><kbd>/</kbd></button><a className="contact-link" href="mailto:soji89@gmail.com"><span>Get in touch</span><ArrowUpRight size={14}/></a></div>
-    </div>
-
-    <section className="canvas-shell" aria-label="Interactive professional network">
-      <div className="canvas-topline">
-        <div className="identity-stamp"><span className="stamp-index">FIG. 01 / 05</span><span className="stamp-name">SOJI JACOB</span><span className="stamp-role">PRODUCT / FINANCIAL SYSTEMS / AI</span></div>
-        <div className="canvas-metrics"><span><b>13+</b> YEARS</span><i/><span><b>05</b> DOMAINS</span><i/><span><b>{graphNodes.length.toString().padStart(2,"0")}</b> NODES</span></div>
-      </div>
-      <div className="map-copy"><p className="eyebrow">A CAREER, CONNECTED</p><h1>I make complex<br/>systems work <em>better.</em></h1><p className="map-instruction"><span className="instruction-pulse"/> Select a node. Follow the connections.</p></div>
-      <div className="cluster-dock"><span className="dock-label">FOCUS BY DOMAIN</span>
-        <button onClick={()=>focusCategory("product")}><i style={{background:categoryColors.product}}/>Product</button>
-        <button onClick={()=>focusCategory("finance")}><i style={{background:categoryColors.finance}}/>Finance</button>
-        <button onClick={()=>focusCategory("ai")}><i style={{background:categoryColors.ai}}/>AI systems</button>
-        <button onClick={()=>focusCategory("experience")}><i style={{background:categoryColors.experience}}/>Experience</button>
-        <button onClick={()=>focusCategory("evidence")}><i style={{background:categoryColors.evidence}}/>Outcomes</button>
-      </div>
-      <div className="map-tools"><button className="map-tool" onClick={()=>zoomIn({duration:220})} aria-label="Zoom in"><Plus size={15}/></button><button className="map-tool" onClick={()=>zoomOut({duration:220})} aria-label="Zoom out"><Minus size={15}/></button><span className="tool-rule"/><button className="map-tool" onClick={reset} aria-label="Reset map"><LocateFixed size={15}/></button><button className="map-tool" onClick={()=>fitView({padding:0.2,duration:650})} aria-label="Fit all nodes"><RotateCcw size={15}/></button></div>
-
-      <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} nodeTypes={nodeTypes}
-        onNodeClick={(_,node)=>focusNode(node.id)} onNodeMouseEnter={(_,node)=>setHoveredId(node.id)} onNodeMouseLeave={()=>setHoveredId(null)}
-        fitView fitViewOptions={{padding:0.2}} minZoom={0.15} maxZoom={1.7} nodesDraggable={false} nodesConnectable={false} elementsSelectable
-        proOptions={{hideAttribution:true}} defaultEdgeOptions={{type:"smoothstep"}} aria-label="Career graph. Use tab to navigate nodes and enter to open details.">
-        <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="#252a2f"/>
-        <MiniMap pannable zoomable nodeColor={node=>categoryColors[(node.data as GraphNodeData).category]??"#888"} maskColor="rgba(8, 10, 12, 0.78)" className="graph-minimap"/>
-        <Controls showInteractive={false} position="bottom-left"/>
-      </ReactFlow>
-      <div className="canvas-footer"><span><span className="footer-cross">✳</span> AN EXPLORABLE RECORD OF WORK</span><span>DRAG TO PAN <i/> SCROLL TO ZOOM <i/> CLICK TO OPEN</span></div>
-    </section>
-
-    <div className="bottom-dock">
-      <button className={`dock-action ${storyId?"active":""}`} onClick={()=>setClusterOpen(v=>!v)}><Compass size={16}/><span>Explore domains</span><ChevronRight size={14}/></button>
-      <button className={`dock-action story-action ${storyId?"active":""}`} onClick={()=>setClusterOpen(v=>!v)}><Route size={16}/><span>Trace a story</span><span className="action-new">3 PATHS</span></button>
-      <div className="dock-spacer"/><span className="dock-hint"><Command size={12}/> + K TO EXPLORE <span className="hint-separator">/</span> ESC TO CLOSE</span>
-      <a className="dock-link" href="https://www.linkedin.com/in/soji-jacob/" target="_blank" rel="noreferrer" aria-label="Soji Jacob on LinkedIn"><Linkedin size={15}/></a>
-    </div>
-
-    {clusterOpen&&<div className="explore-menu"><div className="menu-head"><div><span className="eyebrow">CHOOSE YOUR ROUTE</span><h2>Explore the system</h2></div><button className="close-button" onClick={()=>setClusterOpen(false)} aria-label="Close menu"><X size={17}/></button></div>
-      <p className="menu-intro">Choose a domain to focus the map, or follow a connected story from start to outcome.</p><div className="menu-section-label">DOMAINS</div>
-      <div className="domain-grid">{(["product","finance","ai","experience","evidence"] as Category[]).map(category=><button key={category} onClick={()=>focusCategory(category)}><i style={{background:categoryColors[category]}}/><span>{categoryLabels[category]}</span><ChevronRight size={14}/></button>)}</div>
-      <div className="menu-section-label">TRACE A STORY</div>
-      {stories.map((item,index)=><button className="story-choice" key={item.id} onClick={()=>{startStory(item.id);setClusterOpen(false);}}><span className="story-choice-index">0{index+1}</span><span className="story-choice-copy"><strong>{item.title}</strong><small>{item.subtitle}</small></span><ArrowUpRight size={15}/></button>)}
-    </div>}
-
-    {searchOpen&&<div className="search-scrim" onMouseDown={event=>{if(event.target===event.currentTarget)setSearchOpen(false);}}><div className="search-modal">
-      <div className="search-input-row"><Search size={19}/><input id="graph-search" autoFocus value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search the network..." aria-label="Search node titles and descriptions"/><kbd>ESC</kbd><button className="close-button" onClick={()=>setSearchOpen(false)} aria-label="Close search"><X size={16}/></button></div>
-      <div className="search-results">{!query.trim()?<div className="search-empty"><span className="search-empty-mark">⌘</span><p>Find a skill, platform, project or outcome.</p><small>Try “Odessa”, “migration”, “AI” or “delivery”.</small></div>:searchResults.length?searchResults.map(node=><button key={node.id} className="search-result" onClick={()=>focusNode(node.id)}><span className="result-dot" style={{background:categoryColors[node.data.category]}}/><span className="result-copy"><strong>{node.data.label}</strong><small>{categoryLabels[node.data.category]} · {node.data.eyebrow}</small></span><ArrowUpRight size={15}/></button>):<div className="search-empty"><p>No matching nodes.</p><small>Try a different keyword.</small></div>}</div>
-      <div className="search-foot"><span>SEARCH TITLES, DETAILS AND DOMAINS</span><span>ESC CLOSES</span></div>
-    </div></div>}
-
-    {selected&&<aside className={`detail-panel ${mobileInfoOpen?"mobile-open":""}`} aria-label={`${selected.data.label} details`}>
-      <div className="panel-top"><button onClick={goBack} className="back-button"><ArrowLeft size={15}/><span>Back</span></button><span className="panel-index">NODE / {selected.id.toUpperCase()}</span><button className="close-button" onClick={()=>{setSelectedId(null);setMobileInfoOpen(false);}} aria-label="Close detail panel"><X size={17}/></button></div>
-      <div className="panel-scroll"><span className="panel-category"><i style={{background:categoryColors[selectedCategory??"core"]}}/>{categoryLabels[selectedCategory??"core"]}</span>
-        <h2>{selected.data.label}</h2><p className="panel-description">{selected.data.description}</p>
-        {selected.data.evidence&&<div className="evidence-callout"><span>DOCUMENTED OUTCOME</span><strong>{selected.data.evidence}</strong></div>}
-        <div className="panel-rule"/><span className="panel-section-label">CONTEXT & CONTRIBUTION</span>
-        <ul className="detail-list">{selected.data.details.map((detail,index)=><li key={index}><span>{String(index+1).padStart(2,"0")}</span><p>{detail}</p></li>)}</ul>
-        <div className="panel-rule"/><div className="related-head"><span className="panel-section-label">CONNECTED NODES</span><span>{related.length.toString().padStart(2,"0")}</span></div>
-        <div className="related-list">{related.map(node=><button key={node.id} onClick={()=>focusNode(node.id)}><i style={{background:categoryColors[node.data.category]}}/><span>{node.data.label}</span><ChevronRight size={14}/></button>)}</div>
-        <div className="panel-note"><span>↳</span> Each connection represents a documented or directly related part of the work. Select a connected node to keep exploring.</div>
-      </div>
-      <div className="panel-bottom"><span>SOJI.OS / FIELD NOTES</span><a href="mailto:soji89@gmail.com"><Mail size={14}/> Start a conversation</a></div>
-    </aside>}
-
-    {story&&storyStep&&<div className="story-panel"><div className="story-panel-head"><div><span className="eyebrow">TRACE A STORY · {String(storyIndex+1).padStart(2,"0")} / {String(story.steps.length).padStart(2,"0")}</span><h2>{story.title}</h2></div><button className="close-button" onClick={()=>{setStoryId(null);fitView({padding:0.2,duration:600});}} aria-label="Exit story"><X size={17}/></button></div>
-      <p className="story-subtitle">{story.subtitle}</p><div className="story-progress">{story.steps.map((step,index)=><button key={step.nodeId} className={index===storyIndex?"current":index<storyIndex?"visited":""} onClick={()=>{setStoryIndex(index);const node=graphNodes.find(item=>item.id===step.nodeId);if(node)setCenter(node.position.x+95,node.position.y+30,{zoom:1.1,duration:550});}} aria-label={`Go to story step ${index+1}`}/>)}</div>
-      <div className="story-current"><span className="story-step-index">STEP {String(storyIndex+1).padStart(2,"0")}</span><h3>{graphNodes.find(node=>node.id===storyStep.nodeId)?.data.label}</h3><p>{storyStep.reason}</p></div>
-      <button className="story-next" onClick={advanceStory}>{storyIndex===story.steps.length-1?"Return to the full network":"Follow the connection"}<ArrowUpRight size={15}/></button>
-    </div>}
-
-    <div className="contact-rail"><span>BASED IN BENGALURU, INDIA</span><span className="rail-dot"/><a href="mailto:soji89@gmail.com">SOJI89@GMAIL.COM</a></div>
-  </main>;
+function Landscape() {
+  return <svg className="landscape-art" viewBox="0 0 1200 720" role="img" aria-label="Illustrated landscape with a winding golden path linking five places on the horizon">
+    <defs>
+      <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stopColor="#b9d8d5"/><stop offset=".62" stopColor="#f4d7ad"/><stop offset="1" stopColor="#f4c28f"/></linearGradient>
+      <linearGradient id="water" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#4f969a"/><stop offset="1" stopColor="#244d62"/></linearGradient>
+      <linearGradient id="path" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#fff0a5"/><stop offset=".5" stopColor="#e8b94f"/><stop offset="1" stopColor="#d98a37"/></linearGradient>
+      <filter id="glow"><feGaussianBlur stdDeviation="8"/></filter>
+    </defs>
+    <rect width="1200" height="720" fill="url(#sky)"/>
+    <circle cx="930" cy="130" r="54" fill="#fff0c7" opacity=".8"/><circle cx="930" cy="130" r="85" fill="#fff0c7" opacity=".25"/>
+    <path d="M0 320 120 205 210 282 330 150 460 292 575 190 690 280 805 150 940 280 1040 205 1200 300V720H0Z" fill="#829e9b" opacity=".7"/>
+    <path d="M0 385 135 295 260 365 405 250 555 380 700 270 850 380 1005 265 1200 370V720H0Z" fill="#527f7d"/>
+    <path d="M0 430 Q180 350 330 415T650 410T930 400T1200 430V720H0Z" fill="#335f61"/>
+    <path d="M0 510 Q170 450 350 515T680 490T970 510T1200 470V720H0Z" fill="#244b50"/>
+    <path d="M700 720 Q650 635 730 575T810 480Q830 435 790 400Q760 373 810 340Q860 300 835 255Q810 225 845 195" fill="none" stroke="#f9e7a4" strokeWidth="28" opacity=".25" filter="url(#glow)"/>
+    <path d="M700 720 Q650 635 730 575T810 480Q830 435 790 400Q760 373 810 340Q860 300 835 255Q810 225 845 195" fill="none" stroke="url(#path)" strokeWidth="12" strokeLinecap="round"/>
+    <path d="M0 600 Q120 535 220 575T420 595T610 570T800 620T1010 580T1200 600V720H0Z" fill="#1d4145"/>
+    <path d="M0 640 Q160 595 300 650T580 635T860 655T1200 630V720H0Z" fill="#17363d"/>
+    <g transform="translate(150 390)"><path d="M-60 70 0 -25 60 70Z" fill="#e4b878"/><path d="M-45 70 0 0 45 70Z" fill="#c87e55"/><rect x="-36" y="70" width="72" height="66" rx="4" fill="#f2c88d"/><rect x="-8" y="93" width="18" height="43" fill="#4e7775"/><rect x="-25" y="82" width="11" height="14" fill="#f8e7b8"/><rect x="15" y="82" width="11" height="14" fill="#f8e7b8"/><path d="M-75 136H75" stroke="#e7c18b" strokeWidth="5" strokeLinecap="round"/></g>
+    <g transform="translate(360 435)"><path d="M-90 40 0 -18 90 40V125H-90Z" fill="#c4a16f"/><path d="M-100 42 0 -38 100 42" fill="none" stroke="#f0d2a0" strokeWidth="14" strokeLinejoin="round"/><rect x="-58" y="57" width="25" height="30" fill="#426c6e"/><rect x="-12" y="57" width="25" height="30" fill="#426c6e"/><rect x="34" y="57" width="25" height="30" fill="#426c6e"/><rect x="-13" y="91" width="26" height="34" fill="#825d4a"/></g>
+    <g transform="translate(1020 390)"><path d="M0 0 28 60 8 60 36 113H-36L-8 60H-28Z" fill="#e2c49a"/><path d="M0 22 18 62H-18Z" fill="#d8a46e"/><path d="M-54 115H54" stroke="#e7c18b" strokeWidth="5" strokeLinecap="round"/><circle cx="0" cy="-7" r="11" fill="#e6b955"/></g>
+    <g fill="#f5dfb5" opacity=".8"><circle cx="500" cy="340" r="3"/><circle cx="530" cy="320" r="2"/><circle cx="550" cy="352" r="2"/><circle cx="740" cy="300" r="3"/><circle cx="760" cy="282" r="2"/><circle cx="780" cy="310" r="2"/></g>
+    <g fill="#f3d9a0" opacity=".8"><path d="M80 490q-16-30-32 0q16-8 32 0"/><path d="M910 520q-16-30-32 0q16-8 32 0"/><path d="M1080 490q-16-30-32 0q16-8 32 0"/></g>
+    <g fill="#17363d"><circle cx="85" cy="625" r="3"/><circle cx="105" cy="620" r="2"/><circle cx="1090" cy="625" r="3"/><circle cx="1110" cy="620" r="2"/></g>
+  </svg>;
 }
 
 export default function Home() {
-  return <ReactFlowProvider><NetworkExperience/></ReactFlowProvider>;
+  const [active, setActive] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const selected = places.find(place => place.id === active);
+
+  const goTo = (id: string) => {
+    setActive(id);
+    setMenuOpen(false);
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  return <main>
+    <header className="site-header">
+      <a className="brand" href="#top" aria-label="Soji Jacob home"><span className="brand-mark">s<span>.</span></span><span className="brand-name">soji jacob<small>PRODUCT · FINANCE · AI</small></span></a>
+      <nav className={menuOpen ? "nav-open" : ""} aria-label="Main navigation">
+        <a href="#journey" onClick={() => setMenuOpen(false)}>The journey</a><a href="#impact" onClick={() => setMenuOpen(false)}>The impact</a><a href="#about" onClick={() => setMenuOpen(false)}>A little about me</a>
+      </nav>
+      <a className="header-contact" href="mailto:soji89@gmail.com">Let's talk <ArrowUpRight size={15}/></a>
+      <button className="mobile-menu" onClick={() => setMenuOpen(v => !v)} aria-label={menuOpen ? "Close menu" : "Open menu"}>{menuOpen ? <X/> : <Menu/>}</button>
+    </header>
+
+    <section className="hero" id="top">
+      <div className="hero-copy">
+        <p className="eyebrow"><span className="eyebrow-dot"/> A CAREER BUILT AT THE INTERSECTION OF</p>
+        <h1>I make complex<br/>systems work <em>better.</em></h1>
+        <p className="hero-intro">I'm Soji. A product and technology professional who turns complicated business problems into clear, useful outcomes.</p>
+        <div className="hero-actions"><a className="primary-button" href="#journey">Take the scenic route <ArrowDownRight size={17}/></a><a className="text-link" href="#about">Meet Soji <ArrowUpRight size={15}/></a></div>
+        <div className="hero-note"><MapPin size={14}/> Bengaluru, India <span/> Open to the right next chapter</div>
+      </div>
+      <div className="hero-visual"><div className="visual-sun-label"><span>YOUR ARE HERE</span><strong>SOJI'S WORLD</strong></div><Landscape/><div className="map-pin pin-one"><span>01</span><b>Product</b></div><div className="map-pin pin-two"><span>02</span><b>Finance</b></div><div className="map-pin pin-three"><span>03</span><b>AI &amp; automation</b></div><div className="visual-caption">A winding path through the work that matters <span>↗</span></div></div>
+      <a className="scroll-cue" href="#journey"><span>SCROLL TO EXPLORE</span><i/></a>
+    </section>
+
+    <section className="intro-strip"><span className="strip-label">THE SHORT VERSION</span><p>13+ years of connecting <strong>business needs</strong>, <strong>financial systems</strong> and <strong>technology teams</strong> to make work run better.</p><span className="strip-stamp">BUILT ON EXPERIENCE <Sparkles size={14}/></span></section>
+
+    <section className="journey-section" id="journey">
+      <div className="section-heading"><div><p className="eyebrow">FIVE PLACES THAT SHAPED THE WORK</p><h2>Here's the <em>journey.</em></h2></div><p className="section-aside">No maze to decode. Just the work, the thinking behind it, and what changed.</p></div>
+      <div className="journey-route" aria-label="Career journey destinations">
+        <div className="route-line"><span/></div>
+        {places.map((place, index) => <button key={place.id} className={`destination destination-${place.color} ${active === place.id ? "destination-active" : ""}`} onClick={() => goTo(place.id)} aria-pressed={active === place.id}>
+          <span className="destination-art">{index === 0 ? <span className="art-compass"><Compass/></span> : index === 1 ? <span className="art-building"><BriefcaseBusiness/></span> : index === 2 ? <span className="art-spark"><Sparkles/></span> : index === 3 ? <span className="art-path"><MapPin/></span> : <span className="art-star">✳</span>}<span className="destination-number">{place.number}</span></span>
+          <span className="destination-kicker">{place.kicker}</span><strong>{place.title}</strong><span className="destination-desc">{place.text}</span><span className="destination-cta">Explore this place <ArrowUpRight size={14}/></span>
+        </button>)}
+      </div>
+      <div className="journey-hint"><span>✳</span> Pick any destination to see what lives there <ChevronDown size={14}/></div>
+    </section>
+
+    {selected && <section className={`detail-story detail-${selected.color}`} aria-live="polite">
+      <div className="detail-number">{selected.number}<span> / 05</span></div><div className="detail-main"><p className="eyebrow">{selected.kicker}</p><h2>{selected.title}</h2><p>{selected.text}</p><ul>{selected.details.map(item => <li key={item}>{item}</li>)}</ul></div><button className="detail-close" onClick={() => setActive(null)} aria-label="Close destination details"><X size={18}/></button>
+    </section>}
+
+    <section className="outcomes" id="impact">
+      <div className="outcomes-copy"><p className="eyebrow">GOOD WORK SHOULD SHOW UP IN THE NUMBERS</p><h2>Make the difference<br/><em>visible.</em></h2><p>These are reported outcomes from my work on document processing and delivery. The goal is always the same: less friction, more room for people to do meaningful work.</p><a href="mailto:soji89@gmail.com" className="light-link">Let's talk about outcomes <ArrowUpRight size={15}/></a></div>
+      <div className="outcome-cards"><article className="outcome-card"><span className="outcome-symbol">↗</span><strong>1,500</strong><span className="outcome-unit">documents per day</span><p>Designed processing volume for an AI document parsing solution.</p></article><article className="outcome-card"><span className="outcome-symbol">↘</span><strong>70<small>%</small></strong><span className="outcome-unit">less manual handling</span><p>Reported reduction in manual document handling.</p></article><article className="outcome-card"><span className="outcome-symbol">✳</span><strong>30–35<small>%</small></strong><span className="outcome-unit">faster delivery</span><p>Reported improvement from streamlined requirements and delivery.</p></article></div>
+      <div className="outcome-footnote">Metrics are based on reported project outcomes and are not independently audited.</div>
+    </section>
+
+    <section className="experience-section">
+      <div className="section-heading"><div><p className="eyebrow">THE PEOPLE AND PLACES ALONG THE WAY</p><h2>Experience, not just <em>titles.</em></h2></div><p className="section-aside">Different teams. Different challenges. One recurring theme: make complex things work for real people.</p></div>
+      <div className="timeline">
+        <article><span className="timeline-dot dot-current"/><div className="timeline-year">2025 — 2026</div><div className="timeline-content"><h3>Natixis</h3><p>Product ownership, business analysis and functional consulting across leasing, lending, payments and asset finance. AI document workflows, platform transformation and a cross border migration from P.Lease to Odessa.</p><span className="timeline-tag">FINANCIAL SERVICES · AI WORKFLOWS</span></div></article>
+        <article><span className="timeline-dot"/><div className="timeline-year">2019 — 2025</div><div className="timeline-content"><h3>Société Générale GSC</h3><p>Product and engineering delivery across Odessa lease and loan configuration, a shared customer portal, fuel card mobile application and new business workflows.</p><span className="timeline-tag">PRODUCT DELIVERY · ASSET FINANCE</span></div></article>
+        <article><span className="timeline-dot"/><div className="timeline-year">2012 — 2019</div><div className="timeline-content"><h3>Cognizant / Google GTech</h3><p>Web technology, user experience consulting and digital delivery, including analysis and delivery leadership for a 15 member team.</p><span className="timeline-tag">DIGITAL EXPERIENCE · TEAM DELIVERY</span></div></article>
+      </div>
+    </section>
+
+    <section className="about-section" id="about"><div className="about-sun">✳</div><div className="about-copy"><p className="eyebrow">A LITTLE ABOUT ME</p><h2>Curious by nature.<br/><em>Practical by design.</em></h2><p>I like sitting where business, technology and people meet. My background includes an M.Tech in Software Engineering from BITS Pilani, a PSPO certification, and years spent translating between what a business needs and what a team can build.</p><div className="about-facts"><span>M.Tech · BITS Pilani</span><span>PSPO certified</span><span>13+ years in technology</span></div></div><div className="about-side"><p>Have a complicated problem, a product to shape, or a team that needs a bridge between business and technology?</p><a href="mailto:soji89@gmail.com" className="primary-button">Let's start a conversation <ArrowUpRight size={16}/></a><a className="about-link" href="https://www.linkedin.com/in/soji-jacob/" target="_blank" rel="noreferrer">Find me on LinkedIn <ArrowUpRight size={14}/></a></div></section>
+
+    <footer><a className="brand footer-brand" href="#top"><span className="brand-mark">s<span>.</span></span><span className="brand-name">soji jacob<small>MADE WITH INTENTION</small></span></a><span className="footer-center">A GOOD CAREER IS A JOURNEY, NOT A JOB TITLE.</span><a href="mailto:soji89@gmail.com">soji89@gmail.com <ArrowUpRight size={14}/></a></footer>
+  </main>;
 }
